@@ -1,0 +1,76 @@
+name: Build App
+
+on:
+  workflow_dispatch:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-18.04, windows-2019, macOS-10.15]
+        include:
+          - os: ubuntu-18.04
+            platform: linux
+            arch: x64
+          - os: ubuntu-18.04
+            platform: linux
+            arch: ia32
+          - os: ubuntu-18.04
+            platform: linux
+            arch: arm
+          - os: ubuntu-18.04
+            platform: linux
+            arch: arm64
+
+          - os: macOS-10.15
+            platform: darwin
+            arch: x64
+          - os: macOS-10.15
+            platform: darwin
+            arch: arm64
+
+          - os: windows-2019
+            platform: win32
+            arch: x64
+          - os: windows-2019
+            platform: win32
+            arch: ia32
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        repository: gitduckhq/gitduck
+        token: ${{ secrets.VCS_TOKEN }}
+
+    - name: Bootstrap Node
+      uses: actions/setup-node@v1
+      with:
+        node-version: 12.x
+
+    - name: Install package.json dependencies
+      run: npm i
+      working-directory: electron-call
+
+    - name: Generate GRPC code
+      run: npm run gen
+      working-directory: electron-call
+
+    - name: Build App
+      run: npm run make -- --arch ${{ matrix.arch }}
+      working-directory: electron-call
+
+    - name: Extract version
+      id: extract_version
+      uses: Saionaro/extract-package-version@v1.1.1
+      with:
+        path: electron-call
+
+    - name: Upload release v${{ steps.extract_version.outputs.version }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: duckly-app-${{ matrix.platform }}-${{ matrix.arch }}-v${{ steps.extract_version.outputs.version }}
+        path: electron-call/out/electron-call-${{ matrix.platform }}-${{ matrix.arch }}
